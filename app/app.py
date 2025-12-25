@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Depends
-from app.schemas import PostCreate, PostResponse
+from app.schemas import PostCreate, PostResponse, UserRead, UserCreate, UserUpdate
 from app.db import Post, create_db_and_table, get_async_session
 from app.images import imagekit
+from app.users import auth_backend, current_active_user, fastapi_users
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from contextlib import asynccontextmanager
@@ -20,6 +21,34 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+# Authenticatiun routers
+app.include_router(
+    fastapi_users.get_auth_router(auth_backend),
+    prefix="/auth/jwt",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_register_router(UserRead, UserCreate),
+    prefix="/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_reset_password_router(),
+    prefix="/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_verify_router(UserRead),
+    prefix="/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_users_router(UserRead, UserUpdate),
+    prefix="/users",
+    tags=["users"],
+)
 
 
 @app.post("/upload")
@@ -86,11 +115,9 @@ async def get_feed(session: AsyncSession = Depends(get_async_session)):
         )
     return {"posts": posts_data}
 
+
 @app.delete("/posts/{post_id}")
-async def delete_post(
-    post_id: str,
-    session: AsyncSession = Depends(get_async_session)
-):
+async def delete_post(post_id: str, session: AsyncSession = Depends(get_async_session)):
     try:
         post_uuid = uuid.UUID(post_id)
         result = await session.execute(select(Post).where(Post.id == post_uuid))
@@ -98,7 +125,7 @@ async def delete_post(
 
         if not post:
             raise HTTPException(status_code=404, detail="Post not found")
-        
+
         await session.delete(post)
         await session.commit()
         return {"success": True, "message": "Post deleted successfully"}
