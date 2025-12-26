@@ -117,7 +117,7 @@ async def get_feed(
                 "url": post.url,
                 "file_type": post.file_type,
                 "file_name": post.file_name,
-                "craeted_at": post.created_at.isoformat(),
+                "created_at": post.created_at.isoformat(),
                 "is_owner": post.user_id == user.id,
                 "email": user.id == post.user_id
             }
